@@ -7,6 +7,9 @@ import { MessageSigner } from './crypto/signing.js'
 import { MessageStore } from './storage/messageStore.js'
 import { PeerStore } from './storage/peerStore.js'
 import { CLIInterface } from './ui/cli.js'
+import { RateLimiter } from './security/ratelimit.js'
+import { loadOrCreateProfile, subscribeToProfiles, announceLocalProfile } from './users/profile.js'
+import { HistorySync } from './sync/history.js'
 
 async function main() {
   const keyManager = new KeyManager()
@@ -15,21 +18,32 @@ async function main() {
   const privateKey = keyManager.getPrivateKey()
   const publicKeyString = keyManager.getPublicKeyString()
 
+  const localProfile = await loadOrCreateProfile(publicKeyString)
+
   const messageStore = new MessageStore()
   const peerStore = new PeerStore()
 
+  const rateLimiter = new RateLimiter()
+
   const node = await createNode()
+
+  const historySync = new HistorySync(node, messageStore)
 
   setupEventListeners(node, peerStore)
 
   const signer = new MessageSigner(privateKey)
-  const messageHandler = new MessageHandler(node, signer, publicKeyString, messageStore)
+  const messageHandler = new MessageHandler(node, signer, publicKeyString, messageStore, rateLimiter)
 
   await node.start()
   console.log('Node started with ID:', node.peerId.toString())
   console.log('Listening on:', node.getMultiaddrs().map(ma => ma.toString()))
 
-  const cli = new CLIInterface(messageHandler, peerStore)
+  await historySync.start()
+
+  await subscribeToProfiles(node, peerStore)
+  await announceLocalProfile(node, localProfile)
+
+  const cli = new CLIInterface(messageHandler, peerStore, localProfile, historySync)
 
   await messageHandler.subscribe((message) => {
     cli.displayMessage(message)

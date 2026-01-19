@@ -3,9 +3,21 @@ import { Level } from 'level'
 export class PeerStore {
   constructor(dbPath = './data/peers') {
     this.db = new Level(dbPath, { valueEncoding: 'json' })
+    this._openPromise = null
+  }
+
+  async _ensureOpen() {
+    if (!this._openPromise) {
+      this._openPromise = this.db.open().catch((err) => {
+        this._openPromise = null
+        throw err
+      })
+    }
+    await this._openPromise
   }
 
   async savePeer(peerId, metadata = {}) {
+    await this._ensureOpen()
     const now = Date.now()
     const existing = await this.getPeer(peerId)
 
@@ -22,6 +34,7 @@ export class PeerStore {
   }
 
   async getPeer(peerId) {
+    await this._ensureOpen()
     try {
       return await this.db.get(peerId)
     } catch (err) {
@@ -31,6 +44,7 @@ export class PeerStore {
   }
 
   async getAllPeers() {
+    await this._ensureOpen()
     const peers = []
     for await (const [, value] of this.db.iterator()) {
       peers.push(value)

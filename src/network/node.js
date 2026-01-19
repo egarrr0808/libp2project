@@ -33,7 +33,10 @@ export async function createNode() {
     ],
     services: {
       identify: identify(),
-      pubsub: gossipsub({ emitSelf: false })
+      pubsub: gossipsub({
+        emitSelf: false,
+        allowPublishToZeroPeers: true
+      })
     }
   })
 
