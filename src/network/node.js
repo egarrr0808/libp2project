@@ -5,15 +5,11 @@ import { yamux } from '@chainsafe/libp2p-yamux'
 import { gossipsub } from '@chainsafe/libp2p-gossipsub'
 import { identify } from '@libp2p/identify'
 import { bootstrap } from '@libp2p/bootstrap'
-import { circuitRelayTransport, circuitRelayServer } from '@libp2p/circuit-relay-v2'
 import { multiaddr } from '@multiformats/multiaddr'
 
 export const TOPIC = '/p2p-chat/1.0.0'
 
 const LISTEN_PORT = Number(process.env.P2P_PORT ?? '0')
-const RELAY_DISCOVER = Number(process.env.P2P_RELAY_DISCOVER ?? '2')
-const ENABLE_RELAY_SERVER = process.env.P2P_ENABLE_RELAY_SERVER === 'true'
-const RELAY_MAX_RESERVATIONS = Number(process.env.P2P_RELAY_MAX_RESERVATIONS ?? '32')
 
 const DEFAULT_SERVER_MULTIADDR =
   process.env.P2P_SERVER_MULTIADDR ??
@@ -29,30 +25,10 @@ const BOOTSTRAP_NODES = [
 ].filter(Boolean)
 
 export async function createNode() {
-  const services = {
-    identify: identify(),
-    pubsub: gossipsub({
-      emitSelf: false,
-      allowPublishToZeroPeers: true
-    })
-  }
-
-  if (ENABLE_RELAY_SERVER) {
-    services.relay = circuitRelayServer({
-      advertise: true,
-      reservations: {
-        maxReservations: RELAY_MAX_RESERVATIONS
-      }
-    })
-  }
-
   const node = await createLibp2p({
     addresses: { listen: [multiaddr(`/ip4/0.0.0.0/tcp/${LISTEN_PORT}`)] },
     transports: [
-      tcp(),
-      circuitRelayTransport({
-        discoverRelays: Math.max(0, RELAY_DISCOVER)
-      })
+      tcp()
     ],
     connectionEncryption: [noise()],
     streamMuxers: [yamux()],
@@ -61,7 +37,13 @@ export async function createNode() {
         list: BOOTSTRAP_NODES
       })
     ],
-    services
+    services: {
+      identify: identify(),
+      pubsub: gossipsub({
+        emitSelf: false,
+        allowPublishToZeroPeers: true
+      })
+    }
   })
 
   return node
