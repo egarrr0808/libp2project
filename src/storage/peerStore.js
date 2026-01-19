@@ -21,12 +21,20 @@ export class PeerStore {
     const now = Date.now()
     const existing = await this.getPeer(peerId)
 
+    // Merge addresses if provided, keeping them unique
+    const incomingAddrs = Array.isArray(metadata.addresses) ? metadata.addresses : []
+    const existingAddrs = Array.isArray(existing?.addresses) ? existing.addresses : []
+    const mergedAddrs = [...new Set([...existingAddrs, ...incomingAddrs].filter(Boolean))]
+
+    const { addresses, ...restMeta } = metadata
+
     const value = {
       id: peerId,
       firstSeen: existing?.firstSeen ?? now,
       lastSeen: now,
       ...existing,
-      ...metadata
+      ...restMeta,
+      ...(mergedAddrs.length ? { addresses: mergedAddrs } : {})
     }
 
     await this.db.put(peerId, value)

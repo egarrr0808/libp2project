@@ -10,6 +10,7 @@ import { CLIInterface } from './ui/cli.js'
 import { RateLimiter } from './security/ratelimit.js'
 import { loadOrCreateProfile, subscribeToProfiles, announceLocalProfile } from './users/profile.js'
 import { HistorySync } from './sync/history.js'
+import { startAutoConnect } from './network/autoconnect.js'
 
 async function main() {
   const keyManager = new KeyManager()
@@ -40,8 +41,21 @@ async function main() {
 
   await historySync.start()
 
+  // Start background auto-connect to remembered peers so the swarm
+  // re-forms even if the original bootstrap server goes away.
+  startAutoConnect(node, peerStore)
+
   await subscribeToProfiles(node, peerStore)
   await announceLocalProfile(node, localProfile)
+
+  // Periodically re-announce our profile + addresses so that peers
+  // that come online later (or reconnect) still learn how to dial us.
+  const PROFILE_ANNOUNCE_INTERVAL = 60_000
+  setInterval(() => {
+    announceLocalProfile(node, localProfile).catch((err) => {
+      console.warn('[profile] periodic announce failed', err?.message ?? err)
+    })
+  }, PROFILE_ANNOUNCE_INTERVAL)
 
   const cli = new CLIInterface(messageHandler, peerStore, localProfile, historySync)
 

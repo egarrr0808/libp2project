@@ -11,9 +11,7 @@ export const TOPIC = '/p2p-chat/1.0.0'
 
 const LISTEN_PORT = Number(process.env.P2P_PORT ?? '0')
 
-const DEFAULT_SERVER_MULTIADDR =
-  process.env.P2P_SERVER_MULTIADDR ??
-  '/ip4/207.127.93.169/tcp/4001/p2p/12D3KooWFT6CyLNmfdLf4QZkz9DGj9Yry1TJ3dQx4KM7GZzpn7DA'
+const DEFAULT_SERVER_MULTIADDR = process.env.P2P_SERVER_MULTIADDR || null
 
 const BOOTSTRAP_NODES = [
   '/dnsaddr/bootstrap.libp2p.io/p2p/QmNnooDu7bfjPFoTZYxMNLWUQJyrVwtbZg5gBMjTezGAJN',

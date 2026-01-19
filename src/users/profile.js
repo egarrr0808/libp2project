@@ -40,9 +40,12 @@ export async function loadOrCreateProfile(publicKeyString) {
 }
 
 export async function announceLocalProfile(node, profile) {
+  const addresses = node.getMultiaddrs().map(ma => ma.toString())
+
   const payload = JSON.stringify({
     peerId: node.peerId.toString(),
-    profile
+    profile,
+    addresses
   })
 
   const data = new TextEncoder().encode(payload)
@@ -57,7 +60,12 @@ export async function announceLocalProfile(node, profile) {
   try {
     await node.services.pubsub.publish(PROFILE_TOPIC, data)
   } catch (err) {
-    console.warn('[profile] Failed to announce local profile', err)
+    if (err.name === 'PublishError' && err.message.includes('No peers subscribed to topic')) {
+      // Ignore if no peers are subscribed yet
+      console.warn('[profile] No peers subscribed to profile topic yet')
+    } else {
+      console.warn('[profile] Failed to announce local profile', err)
+    }
   }
 }
 
@@ -79,10 +87,11 @@ export async function subscribeToProfiles(node, peerStore) {
 
       const peerId = decoded.peerId
       const profile = decoded.profile
+      const addresses = Array.isArray(decoded.addresses) ? decoded.addresses : []
       if (!peerId || !profile) return
 
       try {
-        await peerStore.savePeer(peerId, { profile })
+        await peerStore.savePeer(peerId, { profile, addresses })
       } catch (err) {
         console.warn('[profile] Failed to save profile for', peerId, err)
       }
