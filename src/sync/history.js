@@ -63,7 +63,14 @@ export class HistorySync {
       this.pending.set(requestId, { resolve, timeout })
     })
 
-    await this.node.services.pubsub.publish(HISTORY_TOPIC, data)
+    try {
+      await this.node.services.pubsub.publish(HISTORY_TOPIC, data)
+    } catch (err) {
+      console.warn('[history] Failed to request history:', err.message ?? err)
+      this.pending.delete(requestId)
+      return []
+    }
+
     return promise
   }
 
@@ -95,7 +102,11 @@ export class HistorySync {
     }
 
     const data = new TextEncoder().encode(JSON.stringify(response))
-    await this.node.services.pubsub.publish(HISTORY_TOPIC, data)
+    try {
+      await this.node.services.pubsub.publish(HISTORY_TOPIC, data)
+    } catch (err) {
+      console.warn('[history] Failed to publish history response:', err.message ?? err)
+    }
   }
 
   async _handleResponse(payload) {

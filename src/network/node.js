@@ -5,25 +5,55 @@ import { yamux } from '@chainsafe/libp2p-yamux'
 import { gossipsub } from '@chainsafe/libp2p-gossipsub'
 import { identify } from '@libp2p/identify'
 import { bootstrap } from '@libp2p/bootstrap'
+import { circuitRelayTransport, circuitRelayServer } from '@libp2p/circuit-relay-v2'
 import { multiaddr } from '@multiformats/multiaddr'
 
 export const TOPIC = '/p2p-chat/1.0.0'
 
 const LISTEN_PORT = Number(process.env.P2P_PORT ?? '0')
+const RELAY_DISCOVER = Number(process.env.P2P_RELAY_DISCOVER ?? '2')
+const ENABLE_RELAY_SERVER = process.env.P2P_ENABLE_RELAY_SERVER === 'true'
+const RELAY_MAX_RESERVATIONS = Number(process.env.P2P_RELAY_MAX_RESERVATIONS ?? '32')
+
+const DEFAULT_SERVER_MULTIADDR =
+  process.env.P2P_SERVER_MULTIADDR ??
+  '/ip4/207.127.93.169/tcp/4001/p2p/12D3KooWFT6CyLNmfdLf4QZkz9DGj9Yry1TJ3dQx4KM7GZzpn7DA'
 
 const BOOTSTRAP_NODES = [
   '/dnsaddr/bootstrap.libp2p.io/p2p/QmNnooDu7bfjPFoTZYxMNLWUQJyrVwtbZg5gBMjTezGAJN',
   '/dnsaddr/bootstrap.libp2p.io/p2p/QmQCU2EcMqAqQPR2i9bChDtGNJchTbq5TbXJJ16u19uLTa',
   '/dnsaddr/bootstrap.libp2p.io/p2p/QmbLHAnMoJPWSCR5Zhtx6BHJX9KiKNN6tpvbUcqanj75Nb',
   '/dnsaddr/bootstrap.libp2p.io/p2p/QmZa1sAxajnQjVM8WjWXoMbmPd7NsWhfKsPkErzpm9wGkp',
-'\/dnsaddr/bootstrap.libp2p.io/p2p/QmZMxNdpMkewiVZLMpRwoqLFBLFEJT9J7amo4fm8h8f9kS',
-  '/ip4/207.127.93.169/tcp/4001/p2p/12D3KooWFT6CyLNmfdLf4QZkz9DGj9Yry1TJ3dQx4KM7GZzpn7DA'
-]
+  '/dnsaddr/bootstrap.libp2p.io/p2p/QmZMxNdpMkewiVZLMpRwoqLFBLFEJT9J7amo4fm8h8f9kS',
+  DEFAULT_SERVER_MULTIADDR
+].filter(Boolean)
 
 export async function createNode() {
+  const services = {
+    identify: identify(),
+    pubsub: gossipsub({
+      emitSelf: false,
+      allowPublishToZeroPeers: true
+    })
+  }
+
+  if (ENABLE_RELAY_SERVER) {
+    services.relay = circuitRelayServer({
+      advertise: true,
+      reservations: {
+        maxReservations: RELAY_MAX_RESERVATIONS
+      }
+    })
+  }
+
   const node = await createLibp2p({
     addresses: { listen: [multiaddr(`/ip4/0.0.0.0/tcp/${LISTEN_PORT}`)] },
-    transports: [tcp()],
+    transports: [
+      tcp(),
+      circuitRelayTransport({
+        discoverRelays: Math.max(0, RELAY_DISCOVER)
+      })
+    ],
     connectionEncryption: [noise()],
     streamMuxers: [yamux()],
     peerDiscovery: [
@@ -31,13 +61,7 @@ export async function createNode() {
         list: BOOTSTRAP_NODES
       })
     ],
-    services: {
-      identify: identify(),
-      pubsub: gossipsub({
-        emitSelf: false,
-        allowPublishToZeroPeers: true
-      })
-    }
+    services
   })
 
   return node

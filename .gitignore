@@ -1,1 +1,4 @@
 node_modules
+# LevelDB runtime data
+/data/messages
+/data/peers

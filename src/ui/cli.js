@@ -15,7 +15,7 @@ export class CLIInterface {
 
   async start() {
     console.log('P2P Chat Started!')
-    console.log('Type messages and press Enter. Commands: /peers, /history, /quit, /help\n')
+    console.log('Type messages and press Enter. Commands: /peers, /profiles, /history, /sync, /quit, /help\n')
 
     this.rl.prompt()
 
@@ -158,6 +158,8 @@ export class CLIInterface {
       `\n[msg] ${new Date(message.timestamp).toLocaleTimeString()} ` +
       `${message.senderId.slice(0, 8)}: ${message.content}`
     )
-    this.rl.prompt()
+    if (!this.rl.closed) {
+      this.rl.prompt()
+    }
   }
 }
